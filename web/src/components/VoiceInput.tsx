@@ -7,22 +7,18 @@ interface VoiceInputProps {
 const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const startListening = useCallback(() => {
     setError(null);
 
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
       setError('您的浏览器不支持语音识别，请使用Chrome或Edge浏览器');
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError('浏览器不支持语音识别');
-      return;
-    }
-    const recognition = new SpeechRecognition();
+    const recognition = new SR();
 
     recognition.lang = 'zh-CN';
     recognition.continuous = true;
@@ -32,22 +28,20 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
       setIsListening(true);
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       let finalTranscript = '';
-
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
         }
       }
-
       if (finalTranscript) {
         onTranscript(finalTranscript, false);
       }
     };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    recognition.onerror = (event: any) => {
       console.error('语音识别错误:', event.error);
       setError('语音识别出错，请重试');
       setIsListening(false);
