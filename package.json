@@ -5,14 +5,19 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts",
+    "start": "cd web && npx tsx server/index.ts",
     "web": "ts-node src/web/server.ts",
     "web:legacy": "ts-node src/web/server.ts",
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },
-  "keywords": ["multi-agent", "education", "narrative", "kindergarten"],
+  "keywords": [
+    "multi-agent",
+    "education",
+    "narrative",
+    "kindergarten"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
