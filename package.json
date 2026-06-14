@@ -4,7 +4,7 @@
   "description": "基于DOO多智能体的大班幼儿叙事能力提升工具",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cd web && npm install && npm run build",
     "start": "cd web && npx tsx server/index.ts",
     "web": "ts-node src/web/server.ts",
     "web:legacy": "ts-node src/web/server.ts",
