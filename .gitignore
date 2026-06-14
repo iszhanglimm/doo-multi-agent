@@ -4,6 +4,7 @@ data/
 test-data/
 *.js.map
 *.d.ts
+!web/src/speech-recognition.d.ts
 .env
 .DS_Store
 .idea/
