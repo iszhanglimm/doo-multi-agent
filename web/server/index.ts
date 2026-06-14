@@ -319,6 +319,17 @@ app.post('/api/conversation/end', async (req, res) => {
   }
 });
 
+// ========== 静态文件托管（生产环境） ==========
+import { existsSync } from 'fs';
+const distPath = resolve(__dirname, '../dist');
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(resolve(distPath, 'index.html'));
+  });
+  console.log(`📁 前端静态文件已托管: ${distPath}`);
+}
+
 app.listen(port, () => {
   console.log(`🚀 DOO多智能体API服务运行在 http://localhost:${port}`);
 });

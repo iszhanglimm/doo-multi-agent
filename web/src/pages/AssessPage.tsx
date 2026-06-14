@@ -62,13 +62,6 @@ const AssessPage: React.FC = () => {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 
-  const getScenarioLabel = (s: string) => {
-    if (s === 'smart_story_corner') return '🎨 智能故事角';
-    if (s === 'narrative_train') return '🚂 叙事火车';
-    if (s === 'journey_podcast') return '🎭 西游播客';
-    return s;
-  };
-
   const getLevelColor = (level: number) => {
     if (level <= 1) return '#FF6B6B';
     if (level <= 2) return '#FFB347';
