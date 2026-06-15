@@ -8,6 +8,29 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const lastResultTimeRef = useRef<number>(0);
+  const lastTextRef = useRef<string>('');
+
+  const addPunctuation = (text: string, timeSinceLast: number): string => {
+    if (!text) return text;
+    let result = text.trim();
+
+    // 停顿超过1.5秒，加逗号
+    if (timeSinceLast > 1500 && result.length > 0 && !/[，。！？、；：]$/.test(result)) {
+      result += '，';
+    }
+
+    // 疑问词加问号
+    const questionWords = ['吗', '呢', '什么', '怎么', '为什么', '哪里', '谁', '几', '多少', '是不是', '对不对', '好不好', '能不能', '会不会'];
+    for (const w of questionWords) {
+      if (result.endsWith(w) && !/[？。！]$/.test(result)) {
+        result = result.replace(/，$/, '') + '？';
+        break;
+      }
+    }
+
+    return result;
+  };
 
   const startListening = useCallback(() => {
     setError(null);
@@ -26,9 +49,15 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
 
     recognition.onstart = () => {
       setIsListening(true);
+      lastResultTimeRef.current = Date.now();
+      lastTextRef.current = '';
     };
 
     recognition.onresult = (event: any) => {
+      const now = Date.now();
+      const timeSinceLast = now - lastResultTimeRef.current;
+      lastResultTimeRef.current = now;
+
       let finalTranscript = '';
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -39,13 +68,17 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
           interimTranscript += transcript;
         }
       }
+
       // 实时显示识别中的文字
       if (interimTranscript) {
         onTranscript(interimTranscript, false);
       }
-      // 最终确认的文字
+
+      // 最终确认的文字，加标点后写入
       if (finalTranscript) {
-        onTranscript(finalTranscript, true);
+        const punctuated = addPunctuation(finalTranscript, timeSinceLast);
+        lastTextRef.current += punctuated;
+        onTranscript(punctuated, true);
       }
     };
 
@@ -57,6 +90,10 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
 
     recognition.onend = () => {
       setIsListening(false);
+      // 停止录音时，如果最后一段文字没有标点，加句号
+      if (lastTextRef.current && !/[。！？]$/.test(lastTextRef.current)) {
+        onTranscript('。', true);
+      }
     };
 
     recognitionRef.current = recognition;
