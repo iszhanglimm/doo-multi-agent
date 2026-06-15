@@ -7,7 +7,9 @@ config({ path: resolve(__dirname, '../../.env') });
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import bcrypt from 'bcrypt';
 import { DOOMultiAgentSystem } from '../../src';
+import { PostgresStorage } from '../../src/portrait/PostgresStorage';
 import { NarrativeInput, ScenarioType } from '../../src/core/types';
 import {
   createSession,
@@ -28,8 +30,9 @@ app.use(bodyParser.json());
 const system = new DOOMultiAgentSystem();
 
 // 初始化系统
-system.initialize().then(() => {
+system.initialize().then(async () => {
   console.log('✅ DOO多智能体系统服务已启动');
+  await seedDefaultUsers();
 });
 
 // 健康检查
@@ -318,6 +321,168 @@ app.post('/api/conversation/end', async (req, res) => {
     res.status(500).json({ error: '结束对话失败', message: (error as Error).message });
   }
 });
+
+// ========== 用户管理 API ==========
+
+// 获取 PostgreSQL 存储实例
+function getPostgres(): PostgresStorage | null {
+  const storage = system.portraitStorage;
+  return storage instanceof PostgresStorage ? storage : null;
+}
+
+// 登录
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: '请输入用户名和密码' });
+    }
+
+    const pg = getPostgres();
+    if (!pg) {
+      // JSON 模式：硬编码账号
+      const defaults: Record<string, { password: string; name: string; role: string }> = {
+        teacher1: { password: '123456', name: '张老师', role: 'teacher' },
+        teacher2: { password: '123456', name: '李老师', role: 'teacher' },
+        teacher3: { password: '123456', name: '王老师', role: 'teacher' },
+        teacher4: { password: '123456', name: '赵老师', role: 'teacher' },
+        admin: { password: 'admin', name: '管理员', role: 'admin' },
+      };
+      const user = defaults[username];
+      if (!user || user.password !== password) {
+        return res.status(401).json({ error: '用户名或密码错误' });
+      }
+      return res.json({ success: true, user: { id: username, name: user.name, role: user.role, avatar: user.role === 'admin' ? '🔧' : '👩‍🏫' } });
+    }
+
+    const user = await pg.getUser(username);
+    if (!user) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+
+    res.json({
+      success: true,
+      user: { id: username, name: user.name, role: user.role, classId: user.class_id, avatar: user.avatar },
+    });
+  } catch (error) {
+    res.status(500).json({ error: '登录失败', message: (error as Error).message });
+  }
+});
+
+// 注册
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password, name, classId } = req.body;
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    const pg = getPostgres();
+    if (!pg) {
+      return res.status(503).json({ error: '当前为本地模式，请联系管理员' });
+    }
+
+    const existing = await pg.getUser(username);
+    if (existing) {
+      return res.status(409).json({ error: '用户名已存在' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const ok = await pg.createUser(username, hash, name, 'teacher', classId);
+    if (!ok) {
+      return res.status(500).json({ error: '注册失败' });
+    }
+
+    res.json({ success: true, user: { id: username, name, role: 'teacher', classId, avatar: '👩‍🏫' } });
+  } catch (error) {
+    res.status(500).json({ error: '注册失败', message: (error as Error).message });
+  }
+});
+
+// 获取用户列表（管理员）
+app.get('/api/auth/users', async (req, res) => {
+  try {
+    const pg = getPostgres();
+    if (!pg) {
+      return res.json({ success: true, users: [
+        { username: 'teacher1', name: '张老师', role: 'teacher', avatar: '👩‍🏫' },
+        { username: 'admin', name: '管理员', role: 'admin', avatar: '🔧' },
+      ]});
+    }
+    const users = await pg.listUsers();
+    res.json({ success: true, users });
+  } catch (error) {
+    res.status(500).json({ error: '获取用户列表失败' });
+  }
+});
+
+// 修改密码
+app.post('/api/auth/password', async (req, res) => {
+  try {
+    const { username, oldPassword, newPassword } = req.body;
+    if (!username || !oldPassword || !newPassword) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    const pg = getPostgres();
+    if (!pg) {
+      return res.status(503).json({ error: '当前为本地模式' });
+    }
+
+    const user = await pg.getUser(username);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+
+    const valid = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!valid) return res.status(401).json({ error: '原密码错误' });
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pg.updatePassword(username, hash);
+    res.json({ success: true, message: '密码修改成功' });
+  } catch (error) {
+    res.status(500).json({ error: '修改密码失败' });
+  }
+});
+
+// 删除用户（管理员）
+app.delete('/api/auth/user/:username', async (req, res) => {
+  try {
+    const pg = getPostgres();
+    if (!pg) return res.status(503).json({ error: '当前为本地模式' });
+    const ok = await pg.deleteUser(req.params.username);
+    res.json({ success: ok });
+  } catch (error) {
+    res.status(500).json({ error: '删除用户失败' });
+  }
+});
+
+// 启动时创建默认管理员
+async function seedDefaultUsers() {
+  const pg = getPostgres();
+  if (!pg) return;
+
+  const admin = await pg.getUser('admin');
+  if (!admin) {
+    const hash = await bcrypt.hash('admin', 10);
+    await pg.createUser('admin', hash, '管理员', 'admin', undefined, '🔧');
+    console.log('👤 已创建默认管理员: admin/admin');
+  }
+
+  for (let i = 1; i <= 4; i++) {
+    const name = `teacher${i}`;
+    const exists = await pg.getUser(name);
+    if (!exists) {
+      const hash = await bcrypt.hash('123456', 10);
+      const teacherNames = ['张老师', '李老师', '王老师', '赵老师'];
+      await pg.createUser(name, hash, teacherNames[i - 1], 'teacher', `class_00${i}`);
+      console.log(`👤 已创建默认教师: ${name}/123456`);
+    }
+  }
+}
 
 // ========== 静态文件托管（生产环境） ==========
 import { existsSync } from 'fs';

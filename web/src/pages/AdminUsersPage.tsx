@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const CLASSES = [
@@ -19,7 +19,11 @@ const AVATARS = ['👩‍🏫', '👨‍🏫', '👩‍🎓', '👨‍🎓', '�
 
 const AdminUsersPage: React.FC = () => {
   const { user, getAllUsers, adminDeleteUser, adminResetPassword, adminUpdateUser, register } = useAuth();
-  const allUsers = getAllUsers();
+  const [allUsers, setAllUsers] = useState<Array<{ username: string; user: { id: string; name: string; role: string; classId?: string; avatar?: string } }>>([]);
+
+  useEffect(() => {
+    getAllUsers().then(setAllUsers);
+  }, [getAllUsers]);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,6 +43,8 @@ const AdminUsersPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  const refreshUsers = () => { getAllUsers().then(setAllUsers); };
+
   if (user?.role !== 'admin') {
     return (
       <div className="admin-page">
@@ -52,6 +58,7 @@ const AdminUsersPage: React.FC = () => {
     const success = await adminDeleteUser(username);
     if (success) {
       setMessage(`老师 "${username}" 已删除`);
+      refreshUsers();
       setTimeout(() => setMessage(''), 3000);
     } else {
       setError('删除失败');
@@ -86,6 +93,7 @@ const AdminUsersPage: React.FC = () => {
     if (result.success) {
       setMessage('老师添加成功');
       setShowAddModal(false);
+      refreshUsers();
       setAddForm({ username: '', password: '', name: '', classId: 'class_001' });
       setTimeout(() => setMessage(''), 3000);
     } else {
