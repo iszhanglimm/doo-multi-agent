@@ -223,18 +223,27 @@ const AssessPage: React.FC = () => {
                 </div>
                 {conv.status === 'chatting' && (
                   <div className="chat-input-area">
-                    <input
-                      type="text"
-                      className="chat-input"
-                      placeholder="输入孩子的回答..."
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
-                      disabled={conv.loading}
-                    />
-                    <button className="chat-send-btn" onClick={handleChatSend} disabled={!chatInput.trim() || conv.loading}>
-                      发送
-                    </button>
+                    <div className="chat-input-row">
+                      <input
+                        type="text"
+                        className="chat-input"
+                        placeholder="输入孩子的回答..."
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
+                        disabled={conv.loading}
+                      />
+                      <button className="chat-send-btn" onClick={handleChatSend} disabled={!chatInput.trim() || conv.loading}>
+                        发送
+                      </button>
+                    </div>
+                    <div className="chat-voice-row">
+                      <VoiceInput onTranscript={(text, isFinal) => {
+                        if (isFinal) {
+                          setChatInput(prev => prev ? prev + text : text);
+                        }
+                      }} />
+                    </div>
                   </div>
                 )}
                 {conv.status === 'assessing' && (
@@ -1017,7 +1026,59 @@ const AssessPage: React.FC = () => {
           .conv-layout {
             grid-template-columns: 1fr !important;
           }
+          .conv-sidebar {
+            order: 2;
+          }
+          .conv-chat-area {
+            order: 1;
+          }
+          .conv-chat {
+            height: 500px;
+          }
+          .mode-toggle {
+            width: 100%;
+          }
+          .mode-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px 12px;
+            font-size: 13px;
+          }
+          .info-grid {
+            grid-template-columns: 1fr;
+          }
+          .page-header h1 {
+            font-size: 22px;
+          }
+          .page-header p {
+            font-size: 13px;
+          }
         }
+        @media (max-width: 480px) {
+          .conv-chat {
+            height: 400px;
+          }
+          .chat-messages {
+            padding: 12px;
+          }
+          .chat-bubble {
+            max-width: 90%;
+          }
+          .bubble-content {
+            font-size: 13px;
+            padding: 10px 12px;
+          }
+          .chat-input-area {
+            padding: 10px 12px;
+          }
+          .conv-sidebar .assess-form {
+            padding: 16px;
+          }
+          .result-card {
+            padding: 16px;
+          }
+        }
+      }
 
         .mode-toggle {
           display: flex;
@@ -1188,6 +1249,15 @@ const AssessPage: React.FC = () => {
           font-size: 14px;
         }
         .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .chat-input-row {
+          display: flex;
+          gap: 10px;
+        }
+        .chat-voice-row {
+          padding-top: 8px;
+          border-top: 1px solid var(--border);
+          margin-top: 8px;
+        }
         .chat-assessing {
           padding: 20px;
           text-align: center;
