@@ -490,26 +490,46 @@ ${hint}。
       .map(t => `${t.role === 'child' ? '小朋友' : '多多'}: ${t.content}`)
       .join('\n');
 
-    const endHint = turnCount >= 5
-      ? '这是最后一轮了，请给一个温暖的总结性回应。'
-      : `这是第${turnCount}轮对话，请继续追问或回应。`;
+    // 分析孩子的叙事水平
+    const childMsgs = history.filter(t => t.role === 'child').map(t => t.content);
+    const avgLen = childMsgs.reduce((s, m) => s + m.length, 0) / (childMsgs.length || 1);
+    const hasAdjective = childMsgs.some(m => /大|小|漂亮|可爱|美丽|开心|难过|高兴|勇敢|聪明/.test(m));
+    const hasTimeMarker = childMsgs.some(m => /先|然后|最后|突然|后来|从前/.test(m));
+    const hasOpinion = childMsgs.some(m => /我觉得|我认为|我喜欢|我想/.test(m));
 
-    const prompt = `你是一个5岁的小朋友多多。${scenarioContext}。
+    // 推断水平并制定策略
+    let levelHint: string;
+    if (avgLen > 60 && hasAdjective && hasTimeMarker && hasOpinion) {
+      levelHint = '这个小朋友表达能力很强（水平3），你可以问开放性问题："你觉得为什么会这样？""如果让你来改结局，你会怎么改？"';
+    } else if (avgLen > 30 || hasAdjective || hasTimeMarker) {
+      levelHint = '这个小朋友有一定表达能力（水平2），你可以追问细节和感受："它长什么样？""你当时是什么感觉？"';
+    } else {
+      levelHint = '这个小朋友表达较简短（水平1），请用封闭式问题引导："是红色的吗？""它大不大？"，如果孩子说了3个字以下，你可以先示范一小段叙事引导他。';
+    }
+
+    const endHint = turnCount >= 5
+      ? '这是最后一轮了，请给一个温暖的总结性回应，肯定孩子的进步。'
+      : `这是第${turnCount}轮对话，请继续互动。`;
+
+    const prompt = `你是一个5岁的可爱小朋友多多。${scenarioContext}。
 ${endHint}
 
-要求：
-- 像5岁孩子说话，简短可爱
-- 根据小朋友刚说的话具体回应，不要泛泛而谈
-- ${turnCount <= 2 ? '多问细节问题' : turnCount <= 4 ? '可以问感受和观点' : '给鼓励和总结'}
-- 不要重复之前说过的话
+【孩子水平分析】${levelHint}
+
+【你的回应策略】
+1. 情感共鸣：先回应孩子说的内容的情感（"哇它迷路了？那它一定很害怕吧！"）
+2. 具体回应：提到孩子说的具体内容，不要泛泛而谈
+3. 适当追问：根据水平分析选择合适的提问方式
+4. 如果孩子只说了几个字很简短，你可以先示范一小段（"我来先说一个：有一天小猫在花园里追蝴蝶..."），然后邀请孩子继续
+5. 像5岁孩子说话，用"哇""呀""耶""呢"等感叹词，句子简短
 
 对话历史：
 ${dialogueHistory}
 
-请直接回复一句话：`;
+请直接回复一句话（不超过50字），不要加引号或解释：`;
 
     const response = await this.llmClient!.complete(prompt);
-    return response.trim().replace(/^["「]|["」]$/g, '').slice(0, 100);
+    return response.trim().replace(/^["「]|["」]$/g, '').slice(0, 80);
   }
 
   private generateTemplateTurnResponse(

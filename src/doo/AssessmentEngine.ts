@@ -42,9 +42,20 @@ export class AssessmentEngine {
     } else {
       try {
         const llmResult = await this.llmBasedAssessment(content);
-        finalDimensions = this.mergeAssessments(ruleBasedResult.dimensions, llmResult.dimensions);
-        confidence = llmResult.confidence;
-        reasoning = llmResult.reasoning;
+        const divergence = this.calculateDivergence(ruleBasedResult.dimensions, llmResult.dimensions);
+
+        if (divergence > 1) {
+          // 差距过大，触发第二轮 LLM 验证
+          console.log(`评分分歧较大(${divergence.toFixed(1)})，启动第二轮验证...`);
+          const verifyResult = await this.llmVerifyAssessment(content, ruleBasedResult.dimensions, llmResult.dimensions);
+          finalDimensions = verifyResult.dimensions;
+          confidence = verifyResult.confidence;
+          reasoning = `规则评估与首轮LLM评估存在分歧，经二次验证后：${verifyResult.reasoning}`;
+        } else {
+          finalDimensions = this.mergeAssessments(ruleBasedResult.dimensions, llmResult.dimensions);
+          confidence = llmResult.confidence;
+          reasoning = llmResult.reasoning;
+        }
       } catch (error) {
         console.warn('LLM assessment failed, using rule-based only:', error);
         finalDimensions = ruleBasedResult.dimensions;
@@ -238,10 +249,27 @@ export class AssessmentEngine {
 
 评分标准：1=基础水平，2=发展水平，3=优秀水平
 
+【评分示例】
+
+示例1（水平1）：
+叙事："我去了公园。看到了花。回家了。"
+→ 词汇1（无形容词）、句型1（简单句）、结构1（仅事件）、时间1（无标记）、主题1（线索断开）、扩展1（空洞）、表现1（无语调）、观点1（无感受）
+→ 整体水平：1
+
+示例2（水平2）：
+叙事："昨天妈妈带我去动物园，我看到了大象和猴子。大象的耳朵很大，猴子在树上跳来跳去。我觉得很好玩。"
+→ 词汇2（有形容词"大"）、句型2（有介词"在"）、结构3（时间+角色+事件）、时间2（"昨天"）、主题3（围绕动物园）、扩展2（有细节）、表现1（无拟声）、观点2（"我觉得"）
+→ 整体水平：2
+
+示例3（水平3）：
+叙事："从前在一个美丽的森林里，住着一只聪明的小兔子。有一天它去找好朋友小猫，它们先穿过了绿绿的草地，然后趟过了清清的小河，突然一只蝴蝶飞过来，小猫高兴地喊：哇好漂亮呀！最后它们一起开心地回家了。我觉得它们特别勇敢，因为我很喜欢小动物。"
+→ 词汇3（多种形容词副词）、句型3（复合句+介词短语）、结构4要素全、时间3（复杂标记连续）、主题3（完全一致）、扩展3（详细阐述）、表现3（拟声+角色语气）、观点3（完整观点+评价）
+→ 整体水平：3
+
 幼儿叙事内容：
 """${content}"""
 
-请以JSON格式返回评估结果：
+请严格按照上述标准和示例评分，以JSON格式返回评估结果：
 {
   "dimensions": {
     "diction": {
@@ -341,6 +369,68 @@ export class AssessmentEngine {
         ),
       },
     };
+  }
+
+  private calculateDivergence(a: DOODimensions, b: DOODimensions): number {
+    const scores = [
+      Math.abs(a.diction.vocabulary - b.diction.vocabulary),
+      Math.abs(a.diction.sentenceStructure - b.diction.sentenceStructure),
+      Math.abs(a.organization.narrativeStructure - b.organization.narrativeStructure),
+      Math.abs(a.organization.timeMarker - b.organization.timeMarker),
+      Math.abs(a.organization.themeRelevance - b.organization.themeRelevance),
+      Math.abs(a.organization.eventExpansion - b.organization.eventExpansion),
+      Math.abs(a.organization.expressiveness - b.organization.expressiveness),
+      Math.abs(a.opinion.narrativeViewpoint - b.opinion.narrativeViewpoint),
+    ];
+    return scores.reduce((s, v) => s + v, 0) / scores.length;
+  }
+
+  private async llmVerifyAssessment(
+    content: string,
+    ruleBased: DOODimensions,
+    llmBased: DOODimensions
+  ): Promise<AssessmentResult> {
+    const prompt = `你是一位幼儿语言发展评估专家。以下是一段大班幼儿（5-6岁）的叙事内容，请你独立评估。
+
+幼儿叙事内容：
+"""${content}"""
+
+请根据《学前儿童语言学习量表》对每个子维度评分（1=基础，2=发展，3=优秀），以JSON格式返回：
+{
+  "dimensions": {
+    "diction": {"vocabulary": 1|2|3, "sentenceStructure": 1|2|3},
+    "organization": {"narrativeStructure": 1|2|3, "timeMarker": 1|2|3, "themeRelevance": 1|2|3, "eventExpansion": 1|2|3, "expressiveness": 1|2|3},
+    "opinion": {"narrativeViewpoint": 1|2|3}
+  },
+  "confidence": 0.0-1.0,
+  "reasoning": "逐项说明评分理由"
+}`;
+
+    try {
+      const response = await this.llmClient.complete(prompt);
+      return this.parseLLMResponse(response);
+    } catch {
+      // 验证失败，取规则和首轮LLM的较高值
+      const mergeLevel = (a: Level, b: Level): Level => Math.max(a, b) as Level;
+      return {
+        dimensions: {
+          diction: {
+            vocabulary: mergeLevel(ruleBased.diction.vocabulary, llmBased.diction.vocabulary),
+            sentenceStructure: mergeLevel(ruleBased.diction.sentenceStructure, llmBased.diction.sentenceStructure),
+          },
+          organization: {
+            narrativeStructure: mergeLevel(ruleBased.organization.narrativeStructure, llmBased.organization.narrativeStructure),
+            timeMarker: mergeLevel(ruleBased.organization.timeMarker, llmBased.organization.timeMarker),
+            themeRelevance: mergeLevel(ruleBased.organization.themeRelevance, llmBased.organization.themeRelevance),
+            eventExpansion: mergeLevel(ruleBased.organization.eventExpansion, llmBased.organization.eventExpansion),
+            expressiveness: mergeLevel(ruleBased.organization.expressiveness, llmBased.organization.expressiveness),
+          },
+          opinion: { narrativeViewpoint: mergeLevel(ruleBased.opinion.narrativeViewpoint, llmBased.opinion.narrativeViewpoint) },
+        },
+        confidence: 0.7,
+        reasoning: '二次验证失败，取规则与LLM评估的较高值',
+      };
+    }
   }
 
   // ========== 句子结构评估（基于《学前儿童语言学习量表》） ==========
