@@ -30,14 +30,22 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
+      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
         }
       }
+      // 实时显示识别中的文字
+      if (interimTranscript) {
+        onTranscript(interimTranscript, false);
+      }
+      // 最终确认的文字
       if (finalTranscript) {
-        onTranscript(finalTranscript, false);
+        onTranscript(finalTranscript, true);
       }
     };
 

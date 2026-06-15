@@ -242,6 +242,11 @@ const AssessPage: React.FC = () => {
                         if (isFinal) {
                           setChatInput(prev => prev ? prev + text : text);
                         }
+                        // interim: 临时显示在 placeholder 区域
+                        if (!isFinal) {
+                          const input = document.querySelector('.chat-input') as HTMLInputElement;
+                          if (input) input.placeholder = `🎤 ${text}`;
+                        }
                       }} />
                     </div>
                   </div>
