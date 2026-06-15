@@ -1,7 +1,7 @@
 import { ScenarioContext, ScenarioResult, NarrativeInput, ScenarioType } from '../core/types';
 import { AgentOrchestrator } from '../core/AgentOrchestrator';
 import { PortraitEngine } from '../portrait/PortraitEngine';
-import { PortraitStorage } from '../portrait/PortraitStorage';
+import { IPortraitStorage } from '../portrait/IPortraitStorage';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface JourneyPodcastConfig {
@@ -27,13 +27,13 @@ export interface PodcastEpisode {
 export class JourneyPodcast {
   private orchestrator: AgentOrchestrator;
   private portraitEngine: PortraitEngine;
-  private storage: PortraitStorage;
+  private storage: IPortraitStorage;
   private episodes: Map<string, PodcastEpisode[]> = new Map();
 
   constructor(
     orchestrator: AgentOrchestrator,
     portraitEngine: PortraitEngine,
-    storage: PortraitStorage
+    storage: IPortraitStorage
   ) {
     this.orchestrator = orchestrator;
     this.portraitEngine = portraitEngine;

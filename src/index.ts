@@ -5,6 +5,8 @@ import { TeacherAgent } from './agents/TeacherAgent';
 import { PeerAgent } from './agents/PeerAgent';
 import { PortraitEngine } from './portrait/PortraitEngine';
 import { PortraitStorage } from './portrait/PortraitStorage';
+import { PostgresStorage } from './portrait/PostgresStorage';
+import { IPortraitStorage } from './portrait/IPortraitStorage';
 import { RadarChart } from './portrait/RadarChart';
 import { AssessmentEngine } from './doo/AssessmentEngine';
 import { LLMClient } from './nlp/LLMClient';
@@ -28,7 +30,7 @@ export class DOOMultiAgentSystem {
   public teacherAgent: TeacherAgent;
   public peerAgent: PeerAgent;
   public portraitEngine: PortraitEngine;
-  public portraitStorage: PortraitStorage;
+  public portraitStorage: IPortraitStorage;
   public radarChart: RadarChart;
   public assessmentEngine: AssessmentEngine;
   public llmClient: LLMClient;
@@ -58,7 +60,15 @@ export class DOOMultiAgentSystem {
 
     // Portrait system
     this.portraitEngine = new PortraitEngine();
-    this.portraitStorage = new PortraitStorage(config.storage);
+    if (process.env.DATABASE_URL) {
+      const pg = new PostgresStorage(process.env.DATABASE_URL);
+      this.portraitStorage = pg;
+      pg.init().catch(err => console.error('PostgreSQL init failed:', err));
+      console.log('📦 使用 PostgreSQL 持久化存储');
+    } else {
+      this.portraitStorage = new PortraitStorage(config.storage);
+      console.log('📦 使用 JSON 文件存储');
+    }
     this.radarChart = new RadarChart();
 
     // Agents

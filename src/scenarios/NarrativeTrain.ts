@@ -1,7 +1,7 @@
 import { ScenarioContext, ScenarioResult, NarrativeInput, ScenarioType, DOOAssessment } from '../core/types';
 import { AgentOrchestrator } from '../core/AgentOrchestrator';
 import { PortraitEngine } from '../portrait/PortraitEngine';
-import { PortraitStorage } from '../portrait/PortraitStorage';
+import { IPortraitStorage } from '../portrait/IPortraitStorage';
 import { AssessmentEngine } from '../doo/AssessmentEngine';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,13 +22,13 @@ export interface GroupActivity {
 export class NarrativeTrain {
   private orchestrator: AgentOrchestrator;
   private portraitEngine: PortraitEngine;
-  private storage: PortraitStorage;
+  private storage: IPortraitStorage;
   private assessmentEngine: AssessmentEngine;
 
   constructor(
     orchestrator: AgentOrchestrator,
     portraitEngine: PortraitEngine,
-    storage: PortraitStorage,
+    storage: IPortraitStorage,
     assessmentEngine: AssessmentEngine
   ) {
     this.orchestrator = orchestrator;

@@ -1,4 +1,5 @@
 import { ChildPortrait, ClassPortraitGroup, DOOAssessment } from '../core/types';
+import { IPortraitStorage } from './IPortraitStorage';
 import * as fs from 'fs/promises';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
 import * as path from 'path';
@@ -8,7 +9,7 @@ export interface StorageConfig {
   path?: string;
 }
 
-export class PortraitStorage {
+export class PortraitStorage implements IPortraitStorage {
   private config: StorageConfig;
   private dataDir: string;
 
