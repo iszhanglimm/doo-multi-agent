@@ -293,6 +293,47 @@ const AssessPage: React.FC = () => {
                     </ul>
                   </div>
                 )}
+
+                {/* 多智能体协同反馈 */}
+                <div className="result-card collaboration">
+                  <h3>🤝 三智能体协同反馈</h3>
+                  <div className="collaboration-grid">
+                    <div className="collaboration-panel teacher-panel">
+                      <h4>👩‍🏫 小欧老师 · 教学支架</h4>
+                      {(() => {
+                        const teacherMsgs = (conv.interactions || [])
+                          .filter((m: any) => m.type === 'suggestion' && m.from === 'teacher')
+                          .flatMap((m: any) => {
+                            const p = m.payload as any;
+                            return p?.suggestions || p?.teachingNotes || [];
+                          });
+                        return teacherMsgs.length > 0 ? (
+                          <ul>{teacherMsgs.map((s: string, i: number) => (<li key={i}>{s}</li>))}</ul>
+                        ) : (
+                          <p className="empty-collab">本次暂未生成教学支架。</p>
+                        );
+                      })()}
+                    </div>
+                    <div className="collaboration-panel peer-panel">
+                      <h4>🤖 多多 · 同伴鼓励</h4>
+                      {(() => {
+                        const peerMsgs = (conv.interactions || [])
+                          .filter((m: any) => m.from === 'peer' && m.type === 'interaction')
+                          .map((m: any) => (m.payload as any)?.message)
+                          .filter(Boolean);
+                        return peerMsgs.length > 0 ? (
+                          <div className="peer-message-list">
+                            {peerMsgs.map((msg: string, i: number) => (
+                              <div key={i} className="peer-message-card"><p>{msg}</p></div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="empty-collab">本次暂未生成同伴互动记录。</p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
                 <div className="result-card">
                   <h3>📝 完整对话记录</h3>
                   <div className="chat-messages" style={{ maxHeight: 'none' }}>
